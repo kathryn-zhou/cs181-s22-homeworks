@@ -1,8 +1,12 @@
 import numpy as np
+from scipy.special import softmax
+from tqdm import tqdm
 import matplotlib.pyplot as plt
-import scipy
-import pandas as pd
+from scipy.special import logsumexp
 
+def log_smax(X, W):
+        return X.dot(W.T) - np.expand_dims(logsumexp(X.dot(W.T), axis=1), 1)
+    
 # Please implement the fit(), predict(), and visualize_loss() methods of this
 # class. You can add additional private methods by beginning them with two
 # underscores. It may look like the __dummyPrivateMethod below. You can feel
@@ -13,46 +17,44 @@ class LogisticRegression:
     def __init__(self, eta, lam):
         self.eta = eta
         self.lam = lam
-        self.runs = 200000
-        self.neglikeloss = []
+        self.losses = []
 
     # Just to show how to make 'private' methods
     def __dummyPrivateMethod(self, input):
         return None
-
-    def __softmax(self, X):
-        z = np.dot(X, self.W.T) 
-        return np.exp(z - np.expand_dims(scipy.special.logsumexp(z, axis=1), 1))
     
     # TODO: Implement this method!
     def fit(self, X, y):
-        # Add bias
-        X = np.column_stack([np.ones(X.shape[0]), X]) 
-        # One hot encoding
-        y = np.array(pd.get_dummies(y))
+        X = np.c_[X, np.ones(X.shape[0])]
+        y_ohe = np.zeros((y.size, y.max()+1))
+        y_ohe[np.arange(y.size), y] = 1
+        y = y_ohe
 
-        # Generate random weights
         self.W = np.random.rand(3, X.shape[1])
-
-        # Gradient descent
-        for _ in range(self.runs):
-            grad = np.dot((self.__softmax(X)-y).T,X) 
-            self.W -= self.eta * (grad + 2 * self.lam * self.W)
-            loss = -np.sum(y*np.log(self.__softmax(X))) + self.lam * (self.W ** 2).sum()
-            self.neglikeloss.append(loss)
+        for i in tqdm(range(200000)):
+            smax = np.exp(log_smax(X, self.W))
+            grad = (smax-y).T @ X + self.lam * 2 * self.W
+            self.W -= self.eta * grad
+            loss = -np.sum(y*np.log(np.exp(log_smax(X, self.W)))) + \
+                self.lam * (self.W ** 2).sum()
+            self.losses.append(loss)
             
     # TODO: Implement this method!
     def predict(self, X_pred):
         # # The code in this method should be removed and replaced! We included it
         # # just so that the distribution code is runnable and produces a
         # # (currently meaningless) visualization.
-        X_pred = np.column_stack([np.ones(X_pred.shape[0]), X_pred])
-        return np.argmax(np.dot(X_pred, self.W.T), axis=1)
+        # preds = []
+        # for x in X_pred:
+        #     z = np.cos(x ** 2).sum()
+        #     preds.append(1 + np.sign(z) * (np.abs(z) > 0.3))
+        # return np.array(preds)
+        X_pred = np.c_[X_pred, np.ones(X_pred.shape[0])]
+        return np.argmax(X_pred @ self.W.T, axis=1)
 
     # TODO: Implement this method!
     def visualize_loss(self, output_file, show_charts=False):
-        plt.plot(self.neglikeloss)
-        plt.title("Loss over Iterations, eta = " + str(self.eta) + ", lam = " + str(self.lam))
+        plt.plot(self.losses)
         plt.xlabel('Number of Iterations')
         plt.ylabel('Negative Log-Likelihood Loss')
         plt.title(output_file)

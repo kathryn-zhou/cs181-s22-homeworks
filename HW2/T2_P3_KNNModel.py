@@ -1,4 +1,8 @@
 import numpy as np
+import pandas as pd
+import warnings
+
+warnings.simplefilter(action="ignore", category=FutureWarning)
 
 # Please implement the predict() method of this class
 # You can add additional private methods by beginning them with
@@ -16,16 +20,23 @@ class KNNModel:
     def __dummyPrivateMethod(self, input):
         return None
 
+    def __predict_class(self, mag1, temp1):
+        train_df = pd.DataFrame(self.X, columns=["mag", "temp"])
+        train_df["y"] = self.y
+        train_df["dist"] = train_df.apply(lambda row: ((row["mag"]-mag1)/3)**2 + (row["temp"]-temp1)**2, axis=1)
+
+        train_df = train_df.sort_values("dist", ascending=True).drop("dist", 1)
+        return train_df.head(self.K)["y"].mode()[0]
+
     # TODO: Implement this method!
     def predict(self, X_pred):
         # The code in this method should be removed and replaced! We included it
         # just so that the distribution code is runnable and produces a
         # (currently meaningless) visualization.
-        preds = []
-        for x in X_pred:
-            z = np.cos(x ** 2).sum()
-            preds.append(1 + np.sign(z) * (np.abs(z) > 0.3))
-        return np.array(preds)
+        df = pd.DataFrame(X_pred, columns=["mag", "temp"])
+
+        df["class"] = df.apply(lambda row: self.__predict_class(row["mag"], row["temp"]), axis=1)
+        return df["class"].to_numpy()
 
     # In KNN, "fitting" can be as simple as storing the data, so this has been written for you
     # If you'd like to add some preprocessing here without changing the inputs, feel free,
